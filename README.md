@@ -99,6 +99,7 @@ Made with ❤️ by [Rishi](https://github.com/rishichhadva)
 
 - **Node.js** v16 or higher
 - **npm** or **bun** package manager
+- Modern web browser (Chrome, Firefox, Safari, Edge)
 
 ### Installation
 
@@ -134,6 +135,36 @@ npm run build
 ```
 
 The production build will be in the `dist` directory.
+
+### Running the Application
+
+1. **Start the dev server** (see Installation above)
+2. **Select a role** on the login page:
+   - Operations Agent
+   - Operations Manager  
+   - Admin
+3. **Click "Continue to Portal"**
+4. **Navigate** using the sidebar menu
+5. **Test features** based on your selected role
+
+### Application Flow
+
+```
+Login Page → Role Selection → Dashboard → Navigate to Modules
+     ↓
+  Merchants (Manager/Admin only)
+  Orders (All roles)
+  Payments (Manager/Admin only)
+  Tickets (All roles)
+```
+
+### Key Assumptions for Running
+
+- **No Backend Required**: Application uses mock data stored in localStorage
+- **Browser Storage**: Requires localStorage support (all modern browsers)
+- **No Authentication**: Role selection is for demo purposes only
+- **Data Persistence**: All changes persist in browser localStorage
+- **Multi-Tab Support**: Changes sync across browser tabs automatically
 
 ---
 
@@ -196,6 +227,314 @@ The production build will be in the `dist` directory.
 - Category filtering (Technical, Billing, Onboarding, General)
 - Status tracking (Open → In Progress → Resolved → Closed)
 - **Access**: All roles
+
+---
+
+## 📚 Component Documentation
+
+### 🔐 Authentication Component (`src/contexts/AuthContext.tsx`)
+
+#### Setup Steps
+1. The authentication context is automatically initialized in `App.tsx`
+2. No additional setup required - it uses localStorage for persistence
+3. User session persists across page refreshes
+
+#### Assumptions Made
+- Authentication is mock-based for demo purposes
+- User roles are selected on login page (no real credentials)
+- User data is stored in browser localStorage
+- Session persists until explicit logout
+
+#### How to Run
+```bash
+# The auth context is automatically available throughout the app
+# Access it using the useAuth hook:
+import { useAuth } from '@/contexts/AuthContext';
+
+const { user, login, logout, isAuthenticated } = useAuth();
+```
+
+#### Role Definitions
+- **agent**: Operations Agent - Basic operational access
+- **manager**: Operations Manager - Management and reconciliation access
+- **admin**: Admin - Complete system access
+
+---
+
+### 🏠 Dashboard Component (`src/pages/Dashboard.tsx`)
+
+#### Setup Steps
+1. Accessible at `/dashboard` route
+2. Requires authentication (redirects to login if not authenticated)
+3. Automatically loads data from `dataService`
+
+#### Assumptions Made
+- Dashboard shows aggregated data from all modules
+- Metrics update in real-time (1 second polling interval)
+- Role-based visibility for payment metrics (only Manager/Admin)
+- Recent activity combines orders and tickets
+
+#### How to Run
+```bash
+# Navigate to dashboard after login
+# URL: http://localhost:8080/dashboard
+# Or click "Dashboard" in the sidebar navigation
+```
+
+#### Role Definitions
+- **All Roles**: Can view dashboard with basic metrics
+- **Manager/Admin**: Additional payment reconciliation metrics visible
+- **Agent**: Limited metrics (no payment data)
+
+---
+
+### 🏪 Merchant Onboarding Component (`src/pages/Merchants.tsx`)
+
+#### Setup Steps
+1. Accessible at `/merchants` route
+2. Requires Manager or Admin role (Agents have read-only access)
+3. Data loaded from `dataService.getMerchants()`
+
+#### Assumptions Made
+- Merchants can have 4 statuses: `pending`, `under_review`, `approved`, `rejected`
+- Only Managers and Admins can change merchant status
+- Status changes are persisted to localStorage
+- Undo functionality available for all status changes
+- Real-time sync across browser tabs (1 second polling)
+
+#### How to Run
+```bash
+# 1. Login as Manager or Admin role
+# 2. Navigate to /merchants or click "Merchant Onboarding" in sidebar
+# 3. View merchant applications
+# 4. Use action buttons: Review, Approve, Reject
+# 5. Use Undo button to revert last action
+```
+
+#### Role Definitions
+- **Agent**: Read-only access (can view but cannot modify)
+- **Manager**: Full access - can review, approve, reject merchants
+- **Admin**: Full access - can review, approve, reject merchants
+
+#### Available Actions
+- **Review**: Changes status from `pending` to `under_review`
+- **Approve**: Changes status to `approved`
+- **Reject**: Changes status to `rejected`
+- **Undo**: Reverts last status change
+
+---
+
+### 📦 Order Tracking Component (`src/pages/Orders.tsx`)
+
+#### Setup Steps
+1. Accessible at `/orders` route
+2. Available to all authenticated users
+3. Data loaded from `dataService.getOrders()`
+
+#### Assumptions Made
+- Orders have statuses: `pending`, `processing`, `shipped`, `delivered`, `cancelled`
+- Payment statuses: `pending`, `paid`, `failed`, `refunded`
+- Orders are read-only (no edit functionality in this version)
+- Real-time updates via storage event listeners
+
+#### How to Run
+```bash
+# 1. Login with any role
+# 2. Navigate to /orders or click "Order Tracking" in sidebar
+# 3. View all orders in table format
+# 4. Use search to filter by Order ID, Merchant, or Customer
+# 5. View status badges for order and payment status
+```
+
+#### Role Definitions
+- **All Roles**: Full read access to all orders
+- No role-based restrictions for order viewing
+
+#### Features
+- Search functionality (Order ID, Merchant Name, Customer Name)
+- Status badges with color coding
+- Order amount display in Indian Rupees (₹)
+- Date formatting for order creation
+
+---
+
+### 💳 Payment Reconciliation Component (`src/pages/Payments.tsx`)
+
+#### Setup Steps
+1. Accessible at `/orders` route
+2. **Restricted to Manager and Admin roles only**
+3. Data loaded from `dataService.getPayments()`
+
+#### Assumptions Made
+- Payments can have statuses: `pending`, `settled`, `failed`, `disputed`
+- Payment methods: `card`, `upi`, `netbanking`, `wallet`
+- Only pending payments can be reconciled
+- Settled/failed payments can be reset to pending
+- Reconciliation actions are tracked with user name
+- Real-time sync across sessions
+
+#### How to Run
+```bash
+# 1. Login as Manager or Admin role
+# 2. Navigate to /payments or click "Payment Reconciliation" in sidebar
+# 3. View payment transactions
+# 4. For pending payments: Click "Settle" or "Fail"
+# 5. For settled/failed payments: Click "Reset" to revert to pending
+# 6. Use Undo button to revert last action
+```
+
+#### Role Definitions
+- **Agent**: **No Access** - Redirected to dashboard if attempted
+- **Manager**: Full access - can reconcile payments
+- **Admin**: Full access - can reconcile payments
+
+#### Available Actions
+- **Settle**: Marks payment as successfully reconciled
+- **Fail**: Marks payment as failed reconciliation
+- **Reset**: Reverts settled/failed payment back to pending
+- **Undo**: Reverts last reconciliation action
+
+#### Metrics Displayed
+- Total Transactions Amount
+- Settled Amount (successful reconciliations)
+- Pending Reconciliation Amount
+
+---
+
+### 🎫 Support Ticket Management Component (`src/pages/Tickets.tsx`)
+
+#### Setup Steps
+1. Accessible at `/tickets` route
+2. Available to all authenticated users
+3. Data loaded from `dataService.getTickets()`
+
+#### Assumptions Made
+- Ticket statuses: `open`, `in_progress`, `resolved`, `closed`
+- Priorities: `low`, `medium`, `high`, `urgent`
+- Categories: `technical`, `billing`, `onboarding`, `general`
+- Tickets can be assigned to users
+- Only assigned user can resolve their tickets
+- Real-time updates across all users
+
+#### How to Run
+```bash
+# 1. Login with any role
+# 2. Navigate to /tickets or click "Support Tickets" in sidebar
+# 3. View all tickets in table format
+# 4. For unassigned open tickets: Click "Assign to Me"
+# 5. For assigned in-progress tickets: Click "Resolve" or "Close"
+# 6. Use Undo button to revert last action
+```
+
+#### Role Definitions
+- **All Roles**: Full access to ticket management
+- **Agent**: Can assign, resolve, and close tickets
+- **Manager**: Can assign, resolve, and close tickets
+- **Admin**: Can assign, resolve, and close tickets
+
+#### Available Actions
+- **Assign to Me**: Assigns unassigned open ticket to current user, changes status to `in_progress`
+- **Resolve**: Marks ticket as resolved (from `in_progress`)
+- **Close**: Marks ticket as closed (from `in_progress` or `resolved`)
+- **Undo**: Reverts last ticket action
+
+#### Ticket Workflow
+1. **Open** → Assign to user → **In Progress**
+2. **In Progress** → Resolve → **Resolved**
+3. **Resolved** → Close → **Closed**
+4. **In Progress** → Close → **Closed**
+
+---
+
+### 🛡️ Protected Route Component (`src/components/ProtectedRoute.tsx`)
+
+#### Setup Steps
+1. Automatically wraps protected routes in `App.tsx`
+2. No manual setup required
+
+#### Assumptions Made
+- Unauthenticated users are redirected to login (`/`)
+- Users without required roles are redirected to dashboard
+- Role checking is done via `allowedRoles` prop
+- Authentication state is managed by `AuthContext`
+
+#### How to Run
+```typescript
+// Usage in App.tsx:
+<Route
+  path="payments"
+  element={
+    <ProtectedRoute allowedRoles={['manager', 'admin']}>
+      <Payments />
+    </ProtectedRoute>
+  }
+/>
+```
+
+#### Role Definitions
+- **No allowedRoles prop**: All authenticated users can access
+- **allowedRoles=['manager', 'admin']**: Only specified roles can access
+- **Unauthenticated**: Always redirected to login
+
+---
+
+### 💾 Data Service (`src/lib/dataService.ts`)
+
+#### Setup Steps
+1. Automatically initialized - no setup required
+2. Uses browser localStorage for persistence
+3. All components use this service for data operations
+
+#### Assumptions Made
+- localStorage is available (browser environment)
+- Data persists across browser sessions
+- Maximum 50 actions in undo history
+- Real-time sync via storage events and polling
+- Mock data is used as initial data source
+
+#### How to Run
+```typescript
+// Import and use in components:
+import { dataService } from '@/lib/dataService';
+
+// Get data
+const merchants = dataService.getMerchants();
+const payments = dataService.getPayments();
+const tickets = dataService.getTickets();
+
+// Update data
+const updated = dataService.updateMerchantStatus(id, 'approved', userName);
+const updated = dataService.updatePaymentStatus(id, 'settled', userName);
+const updated = dataService.updateTicket(id, { status: 'resolved' });
+
+// Undo
+const result = dataService.undoLastAction();
+```
+
+#### Features
+- **Persistent Storage**: All changes saved to localStorage
+- **Undo System**: Track last 50 actions with undo capability
+- **Cross-Tab Sync**: Changes visible across browser tabs
+- **History Tracking**: Full action history for undo functionality
+
+---
+
+### 🎨 UI Components
+
+#### StatusBadge Component (`src/components/StatusBadge.tsx`)
+- **Purpose**: Displays status with color-coded badges
+- **Usage**: `<StatusBadge status={merchant.status} />`
+- **Status Types**: Supports all status types from merchants, orders, payments, tickets
+
+#### StatCard Component (`src/components/StatCard.tsx`)
+- **Purpose**: Displays metric cards on dashboard
+- **Usage**: `<StatCard title="Total" value={100} icon={Icon} />`
+- **Features**: Trend indicators, descriptions, icons
+
+#### AppSidebar Component (`src/components/AppSidebar.tsx`)
+- **Purpose**: Main navigation sidebar
+- **Features**: Role-based menu filtering, collapsible, user info display
+- **Logout**: Visible logout button with proper styling
 
 ---
 
